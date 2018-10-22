@@ -56,10 +56,27 @@
 
   ;; =========================================
 
+  (def alphabet "abcdefghijklmnopqrstuvwxyz")
+
+  ;; TODO augment the number of possible chars
+  ;; (def class-chars (concat (map str alphabet)
+  ;;                          (map str/upper-case alphabet)))
+
+  ;; (def card (count class-chars))
+
+  ;; Ugly but easy.
+  ;; We cannot use the radix feature of `.toString` above 36
+  ;; TODO do this better so that we case can also use upper case
+  ;; chars in class names. Maybe also digits after the first letter?;
+  (defn make-class-name [n]
+    (->> (Integer/toString n 26)
+         (map #(Integer/parseInt (str %) 26))
+         (map #(nth alphabet %))
+         (apply str)))
 
 
   (def ^:dynamic *collect-styles?* false)
-  (def ^:dynamic **styles-accumulator*)
+  (def ^:dynamic **styles-accumulator* (atom {}))
 
 
   (defn by-file-then-by-line [a b]
@@ -72,22 +89,21 @@
 
 
   (defn add-key [acc k call-site-data]
-    (update acc
-            k
-            (fnil conj (sorted-set-by by-file-then-by-line))
-            call-site-data))
+    (if (get acc k)
+      (update-in acc [k :call-sites] conj call-site-data)
+      (assoc acc k {:class-name (make-class-name (count acc))
+                    :call-sites (sorted-set-by by-file-then-by-line
+                                               call-site-data)})))
 
-  (defn aggregate [key form-meta form-hashcode]
-    (when *collect-styles?*
-      (swap! **styles-accumulator*
-             add-key
-             key
-             (-> (select-keys form-meta [:file :line])
-                 (assoc :form-hashcode form-hashcode)))))
+  (defn aggregate [key form-meta]
+    (swap! **styles-accumulator*
+           add-key
+           key
+           (select-keys form-meta [:file :line])))
 
   (defn extract-styles-from-source []
     (println "Expansion of macros and extraction of styles...")
-    (let [*gettext-keys (atom (sorted-map))
+    (let [*gettext-keys (atom {})
           relative-path "src"
           absolute-path (str (System/getProperty "user.Dir")
                              "/src/")]
@@ -106,10 +122,9 @@
 
       @*gettext-keys))
 
-
   (comment
 
-    (extract-styles-from-source)
+    (clojure.pprint/pprint (extract-styles-from-source))
 
     )
 
@@ -153,12 +168,10 @@
 
       (doseq [style-statement styles-value]
         (aggregate style-statement
-                   (meta &form)
-                   (hash style-statements)))
+                   (meta &form)))
 
 
       styles-value))
-
 
 
   (defmacro plop [form]
