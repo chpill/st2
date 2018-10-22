@@ -95,11 +95,12 @@
                     :call-sites (sorted-set-by by-file-then-by-line
                                                call-site-data)})))
 
-  (defn aggregate [key form-meta]
-    (swap! **styles-accumulator*
-           add-key
-           key
-           (select-keys form-meta [:file :line])))
+  (defn aggregate! [key form-meta]
+    (do (swap! **styles-accumulator*
+            add-key
+            key
+            (select-keys form-meta [:file :line]))
+        (:class-name (get @**styles-accumulator* key))))
 
   (defn extract-styles-from-source []
     (println "Expansion of macros and extraction of styles...")
@@ -166,12 +167,13 @@
 
       (assert (map? styles-value))
 
-      (doseq [style-statement styles-value]
-        (aggregate style-statement
-                   (meta &form)))
+      (str/join " "
+                (for [style-statement styles-value]
+                  (aggregate! style-statement
+                              (meta &form))))
 
 
-      styles-value))
+      ))
 
 
   (defmacro plop [form]
