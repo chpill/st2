@@ -1,13 +1,120 @@
 (ns st2.core
-  #?(:cljs (:require-macros [st2.core]
+  #?(:cljs (:require-macros [st2.core :refer [ss]]
                             [net.cgrand.macrovich :as macrovich]))
   #?(:clj (:require [net.cgrand.macrovich :as macrovich]
-                    [clojure.string :as str])))
+                    [clojure.string :as str]
+
+                    [cljs.build.api]
+
+                    [cljs.analyzer :as analyzer]
+                    [cljs.analyzer.api :as analyzer-api]
+                    [cljs.compiler.api :as compiler]
+                    [clojure.java.io :as io]
+
+                    ))
+
+  #?(:clj (:import (cljs.tagged_literals JSValue))))
+
 
 
 
 
 (macrovich/deftime
+
+  ;; From Roman01la https://gist.github.com/roman01la/98d23f56468e266d86314aadabb56f12
+
+  ;; Sablono's stuff
+  ;; Converting Clojure data into ClojureScript (JS)
+  ;; ====================================================
+  (defprotocol IJSValue
+    (to-js [x]))
+
+  (defn- to-js-map [m]
+    (JSValue. (into {} (map (fn [[k v]] [k (to-js v)])) m)))
+
+  (extend-protocol IJSValue
+    clojure.lang.Keyword
+    (to-js [x]
+      (if (qualified-keyword? x)
+        (str (namespace x) "/" (name x))
+        (name x)))
+    clojure.lang.PersistentArrayMap
+    (to-js [x]
+      (to-js-map x))
+    clojure.lang.PersistentHashMap
+    (to-js [x]
+      (to-js-map x))
+    clojure.lang.PersistentVector
+    (to-js [x]
+      (JSValue. (mapv to-js x)))
+    Object
+    (to-js [x]
+      x)
+    nil
+    (to-js [_]
+      nil))
+
+  ;; =========================================
+
+
+
+  (def ^:dynamic *collect-styles?* false)
+  (def ^:dynamic **styles-accumulator*)
+
+
+  (defn by-file-then-by-line [a b]
+    (let [file-comparison (compare (:file a)
+                                   (:file b))]
+      (if-not (zero? file-comparison)
+        file-comparison
+        (compare (:line a)
+                 (:line b)))))
+
+
+  (defn add-key [acc k call-site-data]
+    (update acc
+            k
+            (fnil conj (sorted-set-by by-file-then-by-line))
+            call-site-data))
+
+  (defn aggregate [key form-meta form-hashcode]
+    (when *collect-styles?*
+      (swap! **styles-accumulator*
+             add-key
+             key
+             (-> (select-keys form-meta [:file :line])
+                 (assoc :form-hashcode form-hashcode)))))
+
+  (defn extract-styles-from-source []
+    (println "Expansion of macros and extraction of styles...")
+    (let [*gettext-keys (atom (sorted-map))
+          relative-path "src"
+          absolute-path (str (System/getProperty "user.Dir")
+                             "/src/")]
+      (binding [*collect-styles?*     true
+                **styles-accumulator* *gettext-keys]
+
+        (let [empty-compiler-state (analyzer-api/empty-state)]
+          (doseq [cljs-file (compiler/cljs-files-in (io/file "src"))]
+            (analyzer/with-warning-handlers
+              [] ;; no handlers!
+              (analyzer-api/analyze-file empty-compiler-state
+                                         cljs-file
+                                         {:cache-analysis false})))))
+
+      (println "Extraction done.")
+
+      @*gettext-keys))
+
+
+  (comment
+
+    (extract-styles-from-source)
+
+    )
+
+
+  ;; ================================================
 
   (defn kebab->camel [^String method-name]
     (str/replace
@@ -25,16 +132,61 @@
           styles))
 
   (defmacro ss [style-statements]
-    (->> style-statements
-         eval
-         #_(try
-             (catch clojure.lang.Compiler$CompilerException e
-               ;; Tell the user that her style declaration is not statically defined and
-               ;; cannot be resolved
-               "style declaration is not statically defined and cannot be resolved"))
 
-         clj-css->rn-css
+    (let [styles-value
+          (-> style-statements
+              clojure.core/eval
+              ;; TODO tell the user nicely
+              ;; (try
+              ;;   ;; (catch clojure.lang.Compiler$CompilerException e
+              ;;   (catch Exception e
+              ;;     ;; Tell the user that her style declaration is not statically defined and
+              ;;     ;; cannot be resolved
+              ;;     (throw (Exception. "style declaration is not statically defined and cannot be resolved"))))
 
-         ;;(list 'js*)
+              ;; TODO move this in output namespace
+              ;; clj-css->rn-css
+              ;; to-js-map
+              )]
 
-         )))
+      (assert (map? styles-value))
+
+      (doseq [style-statement styles-value]
+        (aggregate style-statement
+                   (meta &form)
+                   (hash style-statements)))
+
+
+      styles-value))
+
+
+
+  (defmacro plop [form]
+    (macrovich/case
+        :clj (hash form)
+        :cljs (hash form)))
+
+  )
+
+
+
+
+
+
+(comment
+
+  (ss {:a 3 :d 4})
+
+  (do
+    (def a 1)
+    (def b "#000000")
+
+    (ss {:a a :b b}))
+
+  ;; This cannot work with eval, this is dynamic!
+  (let [a 1 b "#000000"]
+    (ss {:a a :b b}))
+
+  (plop (assoc {:a 1} :b 2))
+  
+  )

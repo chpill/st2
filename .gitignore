@@ -1,1 +1,4 @@
-.cpcache
+.cpcache/
+out/
+figwheel-main.log
+figwheel-main.log.lck
