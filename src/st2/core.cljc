@@ -129,7 +129,12 @@
   (comment
 
     (do (require '[examples.plop])
-        (clojure.pprint/pprint (extract-styles-from-source))))
+        (clojure.pprint/pprint (extract-styles-from-source)))
+
+
+    (clojure.pprint/pprint @**styles-accumulator*)
+
+    )
 
 
   ;; ================================================
@@ -171,6 +176,7 @@
 
       (str/join " "
                 (for [style-statement styles-value]
+                  ;; TODO macrovich to get proper form metadata during clj compilation
                   (aggregate! style-statement
                               (meta &form))))
 
@@ -197,11 +203,33 @@
 
 
   (comment
-
     (output-css!)
 
     )
 
+
+  (defn watch-css! []
+    (add-watch **styles-accumulator*
+               ::css-watcher
+               (fn [_ _ old-styles new-styles]
+                 (output-css!)
+                 ;; (when-not (= (keys old-styles) (keys new-styles)))
+
+                 ))
+
+    (println "css watcher started!"))
+
+  (defn stop-watch-css! []
+    (remove-watch **styles-accumulator* ::css-watcher))
+
+
+  (comment
+
+    (watch-css!)
+
+    (stop-watch-css!)
+
+    )
   )
 
 
