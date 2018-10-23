@@ -1,4 +1,5 @@
-{:deps {org.clojure/clojurescript {:mvn/version "1.10.339"}
+{:deps {org.clojure/clojure {:mvn/version  "1.10.0-beta4"}
+        org.clojure/clojurescript {:mvn/version "1.10.339"}
         net.cgrand/macrovich {:mvn/version "0.2.1"}}
 
 
