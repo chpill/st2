@@ -6,6 +6,10 @@ exporting CSS for the browser and JS styles declaration for react-native.
 EXTREMELY ALPHA SOFTWARE, you have been warned.
 
 
+### Limitations
+
+For the style data to be available during compilation, it must be both in cljc AND required before launching the compilation. This will imply using a clj namespace to compile the code (for development and production).
+
 ### devolopment
 
 Using clojure tools.deps

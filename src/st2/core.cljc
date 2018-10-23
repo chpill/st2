@@ -125,7 +125,8 @@
 
   (comment
 
-    (clojure.pprint/pprint (extract-styles-from-source))
+    (do (require '[examples.plop])
+        (clojure.pprint/pprint (extract-styles-from-source)))
 
     )
 
