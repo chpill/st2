@@ -12,7 +12,9 @@
                :color styles/c-black))
 
 
-
-
 (st2/ss (into styles/black-box
               container))
+
+(def gutter "8px")
+
+(st2/ss {:flex 1 :margin gutter})

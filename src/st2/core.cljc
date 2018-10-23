@@ -11,6 +11,9 @@
                     [cljs.compiler.api :as compiler]
                     [clojure.java.io :as io]
 
+
+                    [garden.core :as garden]
+
                     ))
 
   #?(:clj (:import (cljs.tagged_literals JSValue))))
@@ -126,9 +129,7 @@
   (comment
 
     (do (require '[examples.plop])
-        (clojure.pprint/pprint (extract-styles-from-source)))
-
-    )
+        (clojure.pprint/pprint (extract-styles-from-source))))
 
 
   ;; ================================================
@@ -181,6 +182,25 @@
     (macrovich/case
         :clj (hash form)
         :cljs (hash form)))
+
+
+
+
+  (defn output-css! []
+    (->> @**styles-accumulator*
+         (reduce-kv (fn [acc style-map-entry {:keys [class-name]}]
+                      (conj acc [(str "." class-name)
+                                  (conj {} style-map-entry)]))
+                    [])
+         (garden/css {:pretty-print? false
+                      :output-to "./resources/public/assets/main.css"})))
+
+
+  (comment
+
+    (output-css!)
+
+    )
 
   )
 
